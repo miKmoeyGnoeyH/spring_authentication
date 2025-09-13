@@ -10,6 +10,7 @@ import com.example.authentication.security.RefreshTokenService;
 import com.example.authentication.web.dto.AuthDtos;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,9 @@ public class AuthService {
 	private final LockoutService lockoutService;
 	private final EmailVerificationService emailVerificationService;
 	private final ActivityLogService activityLogService;
+	
+	@Value("${app.email.verification.skip-for-development:false}")
+	private boolean skipEmailVerification;
 
 	@Transactional
 	public AuthDtos.AuthResponse register(AuthDtos.RegisterRequest request) {
@@ -38,7 +42,7 @@ public class AuthService {
 				.email(request.getEmail())
 				.passwordHash(passwordEncoder.encode(request.getPassword()))
 				.displayName(request.getDisplayName())
-				.emailVerified(false)
+				.emailVerified(skipEmailVerification)
 				.build();
 		roleRepository.findByName("USER").ifPresent(r -> user.getRoles().add(r));
 		User saved = userRepository.save(user);
@@ -73,7 +77,7 @@ public class AuthService {
 			lockoutService.recordFailure(principal);
 			throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
 		}
-		if (!user.isEmailVerified()) {
+		if (!skipEmailVerification && !user.isEmailVerified()) {
 			throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
 		}
 		lockoutService.resetFailures(principal);
